@@ -42,13 +42,14 @@ func TestHandleStakeMigrate(t *testing.T) {
 	p, err := NewProtocol(
 		HelperCtx{getBlockInterval, depositGas},
 		&BuilderConfig{
-			Staking:                  g.Staking,
-			PersistStakingPatchBlock: math.MaxUint64,
+			Staking:                       g.Staking,
+			PersistStakingPatchBlock:      math.MaxUint64,
+			SkipContractStakingViewHeight: math.MaxUint64,
 			Revise: ReviseConfig{
 				VoteWeight: g.Staking.VoteWeightCalConsts,
 			},
 		},
-		nil, nil, nil)
+		nil, nil, nil, nil)
 	r.NoError(err)
 	cfg := deepcopy.Copy(genesis.TestDefault()).(genesis.Genesis)
 	initCfg := func(cfg *genesis.Genesis) {
@@ -81,7 +82,7 @@ func TestHandleStakeMigrate(t *testing.T) {
 
 	ctx := genesis.WithGenesisContext(context.Background(), cfg)
 	ctx = protocol.WithFeatureWithHeightCtx(ctx)
-
+	ctx = protocol.WithFeatureCtx(protocol.WithBlockCtx(ctx, protocol.BlockCtx{}))
 	view, err := p.Start(ctx, sm)
 	r.NoError(err)
 	r.NoError(sm.WriteView(p.Name(), view))
@@ -158,6 +159,7 @@ func TestHandleStakeMigrate(t *testing.T) {
 			return nil, nil
 		},
 		func(uint64) (time.Time, error) { return time.Now(), nil },
+		nil,
 	)
 	reg := protocol.NewRegistry()
 	r.NoError(excPrtl.Register(reg))

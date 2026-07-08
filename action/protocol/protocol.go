@@ -16,6 +16,7 @@ import (
 
 	"github.com/iotexproject/iotex-core/v2/action"
 	"github.com/iotexproject/iotex-core/v2/pkg/log"
+	"github.com/iotexproject/iotex-core/v2/state"
 )
 
 var (
@@ -27,7 +28,7 @@ var (
 
 const (
 	// SystemNamespace is the namespace to store system information such as candidates/probationList/unproductiveDelegates
-	SystemNamespace = "System"
+	SystemNamespace = state.SystemNamespace
 )
 
 // Protocol defines the protocol interfaces atop IoTeX blockchain
@@ -119,22 +120,30 @@ type (
 	}
 
 	// Views stores the view for all protocols
-	Views struct {
+	Views interface {
+		Snapshot() int
+		Revert(id int) error
+		Fork() Views
+		Commit(ctx context.Context, sm StateManager) error
+		Read(name string) (View, error)
+		Write(name string, v View)
+	}
+	views struct {
 		snapshotID int
 		snapshots  map[int]map[string]int
 		vm         map[string]View
 	}
 )
 
-func NewViews() *Views {
-	return &Views{
+func NewViews() Views {
+	return &views{
 		snapshotID: 0,
 		snapshots:  make(map[int]map[string]int),
 		vm:         make(map[string]View),
 	}
 }
 
-func (views *Views) Snapshot() int {
+func (views *views) Snapshot() int {
 	views.snapshotID++
 	views.snapshots[views.snapshotID] = make(map[string]int)
 	keys := make([]string, 0, len(views.vm))
@@ -147,7 +156,7 @@ func (views *Views) Snapshot() int {
 	return views.snapshotID
 }
 
-func (views *Views) Revert(id int) error {
+func (views *views) Revert(id int) error {
 	if id > views.snapshotID || id < 0 {
 		return errors.Errorf("invalid snapshot id %d, max id is %d", id, views.snapshotID)
 	}
@@ -164,15 +173,15 @@ func (views *Views) Revert(id int) error {
 	return nil
 }
 
-func (views *Views) Fork() *Views {
-	fork := NewViews()
-	for key, view := range views.vm {
+func (viewss *views) Fork() Views {
+	fork := NewViews().(*views)
+	for key, view := range viewss.vm {
 		fork.vm[key] = view.Fork()
 	}
 	return fork
 }
 
-func (views *Views) Commit(ctx context.Context, sm StateManager) error {
+func (views *views) Commit(ctx context.Context, sm StateManager) error {
 	for _, view := range views.vm {
 		if err := view.Commit(ctx, sm); err != nil {
 			return err
@@ -181,14 +190,14 @@ func (views *Views) Commit(ctx context.Context, sm StateManager) error {
 	return nil
 }
 
-func (views *Views) Read(name string) (View, error) {
+func (views *views) Read(name string) (View, error) {
 	if v, hit := views.vm[name]; hit {
 		return v, nil
 	}
 	return nil, ErrNoName
 }
 
-func (views *Views) Write(name string, v View) {
+func (views *views) Write(name string, v View) {
 	views.vm[name] = v
 }
 

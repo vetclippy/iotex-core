@@ -94,12 +94,13 @@ func TestProtocol_HandleCreateStake(t *testing.T) {
 		DepositGas:    depositGas,
 		BlockInterval: getBlockInterval,
 	}, &BuilderConfig{
-		Staking:                  genesis.TestDefault().Staking,
-		PersistStakingPatchBlock: math.MaxUint64,
+		Staking:                       genesis.TestDefault().Staking,
+		PersistStakingPatchBlock:      math.MaxUint64,
+		SkipContractStakingViewHeight: math.MaxUint64,
 		Revise: ReviseConfig{
 			VoteWeight: genesis.TestDefault().Staking.VoteWeightCalConsts,
 		},
-	}, nil, nil, nil)
+	}, nil, nil, nil, nil)
 	require.NoError(err)
 
 	// set up candidate
@@ -110,6 +111,7 @@ func TestProtocol_HandleCreateStake(t *testing.T) {
 	g.VanuatuBlockHeight = 1
 	ctx := genesis.WithGenesisContext(context.Background(), g)
 	ctx = protocol.WithFeatureWithHeightCtx(ctx)
+	ctx = protocol.WithFeatureCtx(protocol.WithBlockCtx(ctx, protocol.BlockCtx{}))
 	v, err := p.Start(ctx, sm)
 	require.NoError(err)
 	cc, ok := v.(*viewData)
@@ -2936,7 +2938,9 @@ func TestProtocol_FetchBucketAndValidate(t *testing.T) {
 	})
 	t.Run("validate owner and selfstake", func(t *testing.T) {
 		csm, err := NewCandidateStateManager(sm)
-		require.NoError(err)
+		if err != nil {
+			t.Fatal(err)
+		}
 		patches := gomonkey.NewPatches()
 		patches.ApplyPrivateMethod(csm, "NativeBucket", func(index uint64) (*VoteBucket, error) {
 			return &VoteBucket{
@@ -2949,7 +2953,9 @@ func TestProtocol_FetchBucketAndValidate(t *testing.T) {
 		defer patches.Reset()
 
 		_, err = p.fetchBucketAndValidate(protocol.FeatureCtx{}, csm, identityset.Address(1), 1, true, false)
-		require.NoError(err)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 	})
 }
 
@@ -3336,12 +3342,13 @@ func initAll(t *testing.T, ctrl *gomock.Controller) (protocol.StateManager, *Pro
 		DepositGas:    depositGas,
 		BlockInterval: getBlockInterval,
 	}, &BuilderConfig{
-		Staking:                  g.Staking,
-		PersistStakingPatchBlock: math.MaxUint64,
+		Staking:                       g.Staking,
+		PersistStakingPatchBlock:      math.MaxUint64,
+		SkipContractStakingViewHeight: math.MaxUint64,
 		Revise: ReviseConfig{
 			VoteWeight: g.Staking.VoteWeightCalConsts,
 		},
-	}, nil, nil, nil)
+	}, nil, nil, nil, nil)
 	require.NoError(err)
 
 	// set up candidate
@@ -3353,6 +3360,7 @@ func initAll(t *testing.T, ctrl *gomock.Controller) (protocol.StateManager, *Pro
 	require.NoError(csm.putCandidate(candidate2))
 	ctx := genesis.WithGenesisContext(context.Background(), genesis.TestDefault())
 	ctx = protocol.WithFeatureWithHeightCtx(ctx)
+	ctx = protocol.WithFeatureCtx(protocol.WithBlockCtx(ctx, protocol.BlockCtx{}))
 	v, err := p.Start(ctx, sm)
 	require.NoError(err)
 	cc, ok := v.(*viewData)

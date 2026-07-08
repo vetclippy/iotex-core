@@ -55,7 +55,7 @@ func testEqualAllCommit(r *require.Assertions, m *CandidateCenter, old Candidate
 	list := m.All()
 	r.Equal(size+increase, len(list))
 	r.Equal(size+increase, m.Size())
-	all, err := list.toStateCandidateList()
+	all, err := list.toStateCandidateList(true)
 	r.NoError(err)
 
 	// number of changed cand = change
@@ -76,7 +76,7 @@ func testEqualAllCommit(r *require.Assertions, m *CandidateCenter, old Candidate
 	list = m.All()
 	r.Equal(size+increase, len(list))
 	r.Equal(size+increase, m.Size())
-	all1, err := list.toStateCandidateList()
+	all1, err := list.toStateCandidateList(true)
 	r.NoError(err)
 	r.Equal(all, all1)
 	return list, nil
@@ -534,7 +534,7 @@ func TestMultipleNonStakingCandidate(t *testing.T) {
 	})
 }
 
-func candCenterFromNewCandidateStateManager(r *require.Assertions, views *protocol.Views) *CandidateCenter {
+func candCenterFromNewCandidateStateManager(r *require.Assertions, views protocol.Views) *CandidateCenter {
 	// get cand center: csm.ConstructBaseView
 	v, err := views.Read(_protocolID)
 	r.NoError(err)
